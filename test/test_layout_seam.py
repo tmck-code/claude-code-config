@@ -341,6 +341,44 @@ def test_cache_countdown_divider_threaded_into_borders(
     assert cache_div_col in sep_row.ups
 
 
+def test_cache_value_left_padding_matches_siblings_when_justified(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With justify+labels on and a wide row full of slack, the cache value
+    should sit ~3 columns after its vsep │ (base 2 from the vsep's trailing
+    spaces + 1 explicit, matching the other cells' left margin) — not have
+    the row's whole slack budget dumped in front of it."""
+    from helper import strip_ansi
+    _silence_dynamic(monkeypatch)
+    view = SessionView(_session(), Config(justify=True, labels=True))
+    view.__dict__['cache_countdown'] = (187.0, 38)
+    spec = layout.build_wide(view, _tick(), 220, _r)
+
+    top_border_idx = next(i for i, row in enumerate(spec.rows) if row.kind == 'top_border')
+    path_row       = spec.rows[top_border_idx + 1]
+    visible        = strip_ansi(path_row.content)
+
+    cache_div_col  = spec.rows[top_border_idx].downs[-1]   # 1-indexed │ column
+    # Content starts at visible index 1 (col 2); value should begin within a
+    # couple columns of the vsep, not with the row's slack piled up first.
+    after_div      = visible[cache_div_col + 1:]           # text right after the │
+    left_pad       = len(after_div) - len(after_div.lstrip(' '))
+    assert left_pad <= 3, f'cache value left-padded by {left_pad} cols, expected <= 3: {after_div[:20]!r}'
+
+    # The `cache` label painted on the border above should line up with (or
+    # sit very close to) the value's first visible glyph, not the old fixed
+    # +2 offset that drifted off-value once slack grew the left margin.
+    from yas.render.text import _SUPERSCRIPT_TO_ASCII
+    lines     = layout.render_layout(spec, _r)
+    top_line  = strip_ansi(lines[top_border_idx]).translate(_SUPERSCRIPT_TO_ASCII)
+    label_col = top_line.find('cache')
+    value_col = cache_div_col + 1 + left_pad
+    assert label_col != -1, 'cache label missing from top border'
+    assert abs(label_col - value_col) <= 1, (
+        f'cache label at col {label_col} not aligned with value at col {value_col}'
+    )
+
+
 def test_sep_rate_elbow_threaded_into_borders(monkeypatch: pytest.MonkeyPatch) -> None:
     """The │ separator between 5h and 7d rate-limit segments in the wide path/model
     row must have matching ┬/┴ elbows in the top border and separator_dim at the

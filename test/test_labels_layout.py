@@ -13,12 +13,12 @@ import yas.layout as layout
 import yas.renderer as renderer_mod
 import yas.session as session_mod
 from yas.config import Config
-from yas.constants import ICON_LIMIT_5H, ICON_LIMIT_7D
+from yas.constants import CACHE_LEAD, ICON_LIMIT_5H, ICON_LIMIT_7D
 from yas.info import SessionView
 from yas.info.git import GitInfo
 from yas.info.subagents import RunningSubagent, RunningSubagents
 from yas.info.tasks import Task, TaskList
-from yas.render.text import superscript
+from yas.render.text import _visible_width, superscript
 from yas.tokens import TickRecord, TokenLog
 
 from helper import strip_ansi
@@ -124,6 +124,41 @@ def test_value_labels_anchor_over_their_values():
     assert top.index(superscript('5h'))     == row1.index(ICON_LIMIT_5H)
     assert top.index(superscript('remain')) == row1.index('(-')
     assert top.index(superscript('7d'))     == row1.index(ICON_LIMIT_7D)
+
+
+def _cache_view(width_cfg: Config | None = None) -> SessionView:
+    """Example session with a live cache countdown, so the top row grows its
+    trailing cache cell."""
+    view = SessionView(session_mod.SessionInfo.from_dict(_full_limits_dict()),
+                       width_cfg or Config(labels=True))
+    view.__dict__['cache_countdown'] = (2988.0, 40)   # -49:48, 40% elapsed
+    return view
+
+
+@pytest.mark.parametrize('width', [120, 160, 220])
+@pytest.mark.parametrize('justify', [True, False])
+def test_cache_cell_pads_five_columns_and_anchors_its_label(width, justify):
+    # The countdown always sits 5 blank columns (the vsep's 2 trailing spaces
+    # plus CACHE_LEAD) right of its `│` (regression: justification split the
+    # extra around the value, so the pad drifted with terminal width), and the
+    # `cache` caption anchors to that same column.
+    view  = _cache_view(Config(labels=True, justify=justify))
+    spec  = layout.build_wide(view, _tick(), width, _r)
+    lines = [strip_ansi(ln) for ln in layout.render_layout(spec, _r)]
+    top, row1 = lines[0], lines[1]
+    cache_bar = [i for i, ch in enumerate(row1) if ch == '│'][-2]
+    value_col = cache_bar + 1 + len(row1[cache_bar + 1:]) - len(row1[cache_bar + 1:].lstrip())
+    assert value_col - cache_bar == CACHE_LEAD + 3   # 2 vsep spaces + the │ itself
+    assert top.index(superscript('cache')) == value_col
+
+
+@pytest.mark.parametrize('width', [120, 160, 220])
+def test_cache_cell_keeps_row_width(width):
+    # The fixed pad is accounted for in cache_section_w, so the trailing fill
+    # absorbs it and every row still measures exactly `width`.
+    spec  = layout.build_wide(_cache_view(), _tick(), width, _r)
+    lines = layout.render_layout(spec, _r)
+    assert {_visible_width(ln) for ln in lines} == {width}
 
 
 def test_compact_5h_omits_remain_and_burn_rate():

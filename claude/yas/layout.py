@@ -7,6 +7,7 @@ from typing import NamedTuple
 
 from yas.config import Config
 from yas.constants import (
+    CACHE_LEAD,
     _ANSI_RE,
     BOX_H,
     BOX_H_DASH4,
@@ -1006,8 +1007,8 @@ def build_wide(
             cache_section_w = 0
             if cache_on_ and cache_cd is not None:
                 _cache_txt, _cache_w = r.cache_section(*cache_cd, show_icons=view.cfg.show_icons)
-                cache_content   = _cache_txt
-                cache_section_w = vsep_w + _cache_w
+                cache_content   = f'{" " * CACHE_LEAD}{_cache_txt}'
+                cache_section_w = vsep_w + CACHE_LEAD + _cache_w
 
             if timer_mode_ == 'full':
                 elapsed_content, _elapsed_cw = r.elapsed_section(elapsed, clear_str, show_icons=view.cfg.show_icons)
@@ -1272,11 +1273,11 @@ def build_wide(
     helper_w    = _visible_width(helper_text)
 
     if cache_extra:
-        # last_extra (= pad) lands entirely on RHS; cache vsep trailing gives 2 LHS
-        # built-in spaces. Shift split so visible LHS ≈ visible RHS.
-        _c_left         = min(cache_extra, max(0, (cache_extra + last_extra - 2) // 2))
-        _c_right        = cache_extra - _c_left
-        cache_content   = f'{" " * _c_left}{cache_content}{" " * _c_right}'
+        # The left pad is fixed (CACHE_LEAD, already baked into cache_content and
+        # cache_section_w), so the value keeps a stable column under the `cache`
+        # caption no matter how justification moves the cell. Every justification
+        # extra therefore lands on the RHS, where the trailing fill absorbs it.
+        cache_content   = f'{cache_content}{" " * cache_extra}'
         cache_section_w += cache_extra
 
     cache_div_col = helper_anchor + helper_w + vsep_w if cache_section_w else None
@@ -1389,9 +1390,10 @@ def build_wide(
                     top_labels.append(('used', _h7base + _h7[1 + _h7_shift]))
                 if len(_h7) >= 3 + _h7_shift:
                     top_labels.append(('burn rate', _h7base + _h7[2 + _h7_shift]))
-        # Cache countdown cell begins just after the cache │.
+        # Cache countdown label anchors to the countdown value's own column
+        # (vsep trailing 2 + CACHE_LEAD), not to the cache │.
         if cache_section_w and cache_div_col is not None:
-            top_labels.append(('cache', cache_div_col + 2))
+            top_labels.append(('cache', cache_div_col + 3 + CACHE_LEAD))
 
     if pill_pct:
         rows += [

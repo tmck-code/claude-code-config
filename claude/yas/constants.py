@@ -432,6 +432,12 @@ GLYPH_IN        = '\u2208'  # U+2208 element-of (path/branch separator)
 GLYPH_UNLIMITED = '\u221e'  # U+221E infinity (unlimited rate limit)
 SPARK_RAMP      = '\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588'  # U+2581..U+2588 sparkline density ramp
 
+# Explicit left pad, in columns, between the cache cell's vsep block and the
+# countdown value on the top row (layout.py `build_wide`). Added on top of the
+# vsep's own 2 trailing spaces, so the value sits CACHE_LEAD + 2 columns right
+# of its `│` -- and the `cache` caption anchors to that same column.
+CACHE_LEAD = 3
+
 # Section-header column labels (render/borders.py `_overlay_labels`) that have
 # a shorter, still-readable form for when their anchor's border run is too
 # short for the full word. Tried before falling back to a whole-word-boundary
